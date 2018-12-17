@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/sirupsen/logrus"
+
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -25,17 +27,20 @@ import (
 
 var cfgFile string
 var baseDir string
+var verbose bool
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "bqv",
 	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Long:  ``,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		if verbose {
+			logrus.SetLevel(logrus.DebugLevel)
+		} else {
+			logrus.SetLevel(logrus.InfoLevel)
+		}
+	},
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	//	Run: func(cmd *cobra.Command, args []string) { },
@@ -57,8 +62,8 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.bqv.yaml)")
-
 	rootCmd.PersistentFlags().StringVar(&baseDir, "basedir", ".", "Basedir of the views (default is the current dir")
+	rootCmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "Log option")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
