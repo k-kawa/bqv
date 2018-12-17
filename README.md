@@ -10,7 +10,7 @@ go intall github.com/k-kawa/bqv
 
 # How to use
 
-Make directory based on the names of the dataset and the view that you want to create.
+Make a directory based on the names of the dataset and the view that you want to create.
 
 ```sh
 mkdir -p your_dataset/your_view
@@ -31,7 +31,7 @@ bqv list
 your_dataset.your_view
 ```
 
-Make the views listed in the GCP project named `your_project` with `bqv apply` command.
+Make the view into the GCP project named `your_project` with `bqv apply` command.
 
 ```sh
 bqv apply --projecID=your_project
@@ -41,7 +41,7 @@ bra bra bra ....
 
 ## With parameter
 
-You can use the `query.sql` file as a template and replace the placeholders written in it when you run `bqv apply`.
+You can use the `query.sql` file as a template and replace the placeholders in it when you run `bqv apply`.
 
 ```sh
 # Create another directory
