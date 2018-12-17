@@ -67,7 +67,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.bqv.yaml)")
 	rootCmd.PersistentFlags().StringVar(&baseDir, "basedir", ".", "Basedir of the views (default is the current dir")
 	rootCmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "Log option")
-	queryCmd.PersistentFlags().StringVar(&paramFile, "paramFile", ".params", "Path to paramegter file")
+	rootCmd.PersistentFlags().StringVar(&paramFile, "paramFile", ".params", "Path to paramegter file")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
