@@ -15,25 +15,46 @@
 package cmd
 
 import (
-	"context"
+	"errors"
+	"fmt"
+	"regexp"
+	"strings"
 
-	"cloud.google.com/go/bigquery"
 	"github.com/k-kawa/bqv/bqv"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
-var projectID string
-
-// applyCmd represents the apply command
-var applyCmd = &cobra.Command{
-	Use:   "apply",
-	Short: "Apply the views",
-	Long:  `Apply the views`,
+// queryCmd represents the query command
+var queryCmd = &cobra.Command{
+	Use:   "query",
+	Short: "Query",
+	Long:  ``,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) < 1 {
+			return errors.New("dataset.view name")
+		}
+		name := args[0]
+		ptn := regexp.MustCompile("^([^.]+)\\.([^.]+)$")
+		matched := ptn.MatchString(name)
+		if !matched {
+			return errors.New("argument must be in (dataset).(view) format")
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		configs, err := bqv.CreateViewConfigsFromDatasetDir(baseDir)
 		if err != nil {
 			logrus.Errorf("Failed to read views: %s", err.Error())
+			return
+		}
+
+		names := strings.Split(args[0], ".")
+
+		viewConfig := findViewConfig(configs, names[0], names[1])
+		if viewConfig == nil {
+			logrus.Error("Not found")
+			return
 		}
 
 		params, err := loadParamFile()
@@ -42,31 +63,36 @@ var applyCmd = &cobra.Command{
 			return
 		}
 
-		ctx := context.Background()
-
-		client, err := bigquery.NewClient(ctx, projectID)
+		q, err := viewConfig.QueryWithParam(params)
 		if err != nil {
-			logrus.Panic("Failed to create bigquery client")
+			logrus.Errorf("%s", err.Error())
+			return
 		}
-		for _, config := range configs {
-			if err = config.Apply(ctx, client, params); err != nil {
-				logrus.Printf("Failed to create view %s.%s: %s\n", config.DatasetName, config.ViewName, err.Error())
-			}
-		}
+
+		fmt.Print(q)
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(applyCmd)
+	rootCmd.AddCommand(queryCmd)
 
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// applyCmd.PersistentFlags().String("foo", "", "A help for foo")
-	applyCmd.PersistentFlags().StringVar(&projectID, "projectID", "", "GCP project name")
+	// queryCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// applyCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// queryCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
+}
+
+func findViewConfig(viewConfigs []*bqv.ViewConfig, datasetName, viewName string) *bqv.ViewConfig {
+	for _, viewConfig := range viewConfigs {
+		if strings.Compare(viewConfig.DatasetName, datasetName) == 0 && strings.Compare(viewConfig.ViewName, viewName) == 0 {
+			return viewConfig
+		}
+	}
+	return nil
 }

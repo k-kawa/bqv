@@ -15,7 +15,9 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/sirupsen/logrus"
@@ -28,6 +30,7 @@ import (
 var cfgFile string
 var baseDir string
 var verbose bool
+var paramFile string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -64,6 +67,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.bqv.yaml)")
 	rootCmd.PersistentFlags().StringVar(&baseDir, "basedir", ".", "Basedir of the views (default is the current dir")
 	rootCmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "Log option")
+	queryCmd.PersistentFlags().StringVar(&paramFile, "paramFile", ".params", "Path to paramegter file")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
@@ -94,4 +98,22 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
+}
+
+func loadParamFile() (map[string]string, error) {
+	ret := make(map[string]string)
+	if _, err := os.Stat(paramFile); os.IsNotExist(err) {
+		return ret, nil
+	}
+	data, err := ioutil.ReadFile(paramFile)
+	if err != nil {
+		logrus.Errorf("%s", err.Error())
+		return nil, err
+	}
+	if err = json.Unmarshal(data, &ret); err != nil {
+		logrus.Errorf("%s", err.Error())
+		return nil, err
+	}
+
+	return ret, nil
 }

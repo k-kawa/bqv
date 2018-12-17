@@ -1,11 +1,13 @@
 package bqv
 
 import (
+	"bytes"
 	"context"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
+	"text/template"
 
 	"google.golang.org/api/googleapi"
 
@@ -20,7 +22,7 @@ type ViewConfig struct {
 	DatasetName string
 }
 
-func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client) error {
+func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params map[string]string) error {
 	dataset := client.Dataset(v.DatasetName)
 
 	// check if the dataset exists.
@@ -44,9 +46,15 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client) error {
 	}
 
 	logrus.Infof("Creating view(%s.%s) ...", view.DatasetID, view.TableID)
+	q, err := v.QueryWithParam(params)
+	if err != nil {
+		logrus.Errorf("Failed to execute template: %s", err.Error())
+		return err
+	}
+
 	err = view.Create(ctx, &bigquery.TableMetadata{
 		Name:           v.ViewName,
-		ViewQuery:      v.Query,
+		ViewQuery:      q,
 		UseStandardSQL: true,
 	})
 	if err != nil {
@@ -54,6 +62,20 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client) error {
 		return err
 	}
 	return nil
+}
+
+func (v *ViewConfig) QueryWithParam(params map[string]string) (string, error) {
+	t, err := template.New("q").Parse(v.Query)
+	if err != nil {
+		logrus.Errorf("Failed to parse query: %s", err.Error())
+		return "", err
+	}
+	var buf bytes.Buffer
+	if err = t.Execute(&buf, params); err != nil {
+		logrus.Errorf("Failed to execute template: %s", err.Error())
+		return "", err
+	}
+	return buf.String(), nil
 }
 
 func CreateViewConfigsFromDatasetDir(dir string) ([]*ViewConfig, error) {
@@ -67,7 +89,7 @@ func CreateViewConfigsFromDatasetDir(dir string) ([]*ViewConfig, error) {
 		if !f.IsDir() {
 			continue
 		}
-		err := CreateViewConfigsFromViewDir(filepath.Join(dir, f.Name()), &ret, f.Name())
+		err := createViewConfigsFromViewDir(filepath.Join(dir, f.Name()), &ret, f.Name())
 		if err != nil {
 			logrus.Panicf("Failed to readViews: %s", err.Error())
 		}
@@ -76,7 +98,7 @@ func CreateViewConfigsFromDatasetDir(dir string) ([]*ViewConfig, error) {
 	return ret, nil
 }
 
-func CreateViewConfigsFromViewDir(dir string, ret *[]*ViewConfig, datasetName string) error {
+func createViewConfigsFromViewDir(dir string, ret *[]*ViewConfig, datasetName string) error {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		logrus.Panicf("Failed to list files in dir: %s", dir)
@@ -86,7 +108,6 @@ func CreateViewConfigsFromViewDir(dir string, ret *[]*ViewConfig, datasetName st
 		if !f.IsDir() {
 			continue
 		}
-		// viewConfig, err := readView(filepath.Join(dir, f.Name()))
 		viewConfig, err := createViewConfigFromQueryFile(datasetName, f.Name(), filepath.Join(dir, f.Name(), "query.sql"))
 		if err != nil {
 			return err
