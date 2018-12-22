@@ -49,7 +49,7 @@ var applyCmd = &cobra.Command{
 			logrus.Panic("Failed to create bigquery client")
 		}
 		for _, config := range configs {
-			if err = config.Apply(ctx, client, params); err != nil {
+			if _, err = config.Apply(ctx, client, params); err != nil {
 				logrus.Printf("Failed to create view %s.%s: %s\n", config.DatasetName, config.ViewName, err.Error())
 			}
 		}

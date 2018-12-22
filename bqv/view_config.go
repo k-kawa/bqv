@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 
 	"google.golang.org/api/googleapi"
@@ -22,7 +23,7 @@ type ViewConfig struct {
 	DatasetName string
 }
 
-func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params map[string]string) error {
+func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params map[string]string) (bool, error) {
 	dataset := client.Dataset(v.DatasetName)
 
 	// check if the dataset exists.
@@ -34,13 +35,17 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 		})
 		if err != nil {
 			logrus.Errorf("Failed to create dataset: %s", err.Error())
-			return err
+			return false, err
 		}
 	}
 
 	view := client.Dataset(v.DatasetName).Table(v.ViewName)
-	_, err = view.Metadata(ctx)
+	m, err := view.Metadata(ctx)
 	if err == nil {
+		if strings.Compare(m.ViewQuery, v.Query) == 0 {
+			logrus.Infof("Skipping View(%s.%s). It exists and its query hasn't changed.", view.DatasetID, view.TableID)
+			return false, nil
+		}
 		logrus.Infof("View(%s.%s) existed. Deleting it...", view.DatasetID, view.TableID)
 		view.Delete(ctx)
 	}
@@ -49,7 +54,7 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 	q, err := v.QueryWithParam(params)
 	if err != nil {
 		logrus.Errorf("Failed to execute template: %s", err.Error())
-		return err
+		return false, err
 	}
 
 	err = view.Create(ctx, &bigquery.TableMetadata{
@@ -59,9 +64,27 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 	})
 	if err != nil {
 		logrus.Errorf("Faieled to create view: %s", err.Error())
-		return err
+		return false, err
 	}
-	return nil
+	return true, nil
+}
+
+func (v *ViewConfig) DeleteIfExist(ctx context.Context, client *bigquery.Client) (bool, error) {
+	dataset := client.Dataset(v.DatasetName)
+	_, err := dataset.Metadata(ctx)
+	if err != nil && hasStatusCode(err, http.StatusNotFound) {
+		logrus.Debugf("Dataset(%s) didn't exist.", v.DatasetName)
+		return false, nil
+	}
+	view := client.Dataset(v.DatasetName).Table(v.ViewName)
+
+	_, err = view.Metadata(ctx)
+	if err == nil {
+		logrus.Debugf("View(%s.%s) was found. deleteing...", v.DatasetName, v.ViewName)
+		view.Delete(ctx)
+		return true, nil
+	}
+	return false, nil
 }
 
 func (v *ViewConfig) QueryWithParam(params map[string]string) (string, error) {
