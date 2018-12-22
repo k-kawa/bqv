@@ -1,12 +1,24 @@
 # bqv
 
-The simplest tool to manage Bigquery's views in CI/CD.
+The simplest tool to manage Bigquery's views.
+
+<!-- TOC -->
+
+- [bqv](#bqv)
+- [How to install](#how-to-install)
+- [How to use](#how-to-use)
+    - [With parameter](#with-parameter)
+
+<!-- /TOC -->
 
 # How to install
 
 ```sh
 go intall github.com/k-kawa/bqv
 ```
+
+Or you can use `bqv` as a Docker image, which is available at [kkawa/bqv](https://cloud.docker.com/repository/docker/kkawa/bqv)
+
 
 # How to use
 
