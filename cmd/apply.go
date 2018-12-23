@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"context"
+	"os"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/k-kawa/bqv/bqv"
@@ -34,24 +35,34 @@ var applyCmd = &cobra.Command{
 		configs, err := bqv.CreateViewConfigsFromDatasetDir(baseDir)
 		if err != nil {
 			logrus.Errorf("Failed to read views: %s", err.Error())
+			os.Exit(1)
 		}
 
 		params, err := loadParamFile()
 		if err != nil {
-			logrus.Errorf("%s", err.Error())
-			return
+			logrus.Errorf("Failed to read parameteer file: %s", err.Error())
+			os.Exit(1)
 		}
 
 		ctx := context.Background()
 
 		client, err := bigquery.NewClient(ctx, projectID)
 		if err != nil {
-			logrus.Panic("Failed to create bigquery client")
+			logrus.Errorf("Failed to create bigquery client: %s", err.Error())
+			os.Exit(1)
 		}
+
+		errCount := 0
 		for _, config := range configs {
 			if _, err = config.Apply(ctx, client, params); err != nil {
-				logrus.Printf("Failed to create view %s.%s: %s\n", config.DatasetName, config.ViewName, err.Error())
+				logrus.Errorf("Failed to create view %s.%s: %s", config.DatasetName, config.ViewName, err.Error())
+				errCount += 1
 			}
+		}
+
+		if errCount > 0 {
+			logrus.Errorf("Some views might get updated but %d errors occured", errCount)
+			os.Exit(1)
 		}
 	},
 }

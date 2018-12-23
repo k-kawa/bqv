@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/k-kawa/bqv/bqv"
 	"github.com/sirupsen/logrus"
@@ -31,6 +32,7 @@ var listCmd = &cobra.Command{
 		configs, err := bqv.CreateViewConfigsFromDatasetDir(baseDir)
 		if err != nil {
 			logrus.Errorf("Failed to read views: %s", err.Error())
+			os.Exit(1)
 		}
 		for _, config := range configs {
 			fmt.Printf("%s.%s\n", config.DatasetName, config.ViewName)
