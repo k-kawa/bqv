@@ -14,7 +14,7 @@ The simplest tool to manage Bigquery's views.
 # How to install
 
 ```sh
-go intall github.com/k-kawa/bqv
+go install github.com/k-kawa/bqv
 ```
 
 Or you can use `bqv` as a Docker image, which is available at [kkawa/bqv](https://cloud.docker.com/repository/docker/kkawa/bqv)
