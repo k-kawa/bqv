@@ -17,6 +17,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 
@@ -46,7 +47,7 @@ var queryCmd = &cobra.Command{
 		configs, err := bqv.CreateViewConfigsFromDatasetDir(baseDir)
 		if err != nil {
 			logrus.Errorf("Failed to read views: %s", err.Error())
-			return
+			os.Exit(1)
 		}
 
 		names := strings.Split(args[0], ".")
@@ -54,19 +55,19 @@ var queryCmd = &cobra.Command{
 		viewConfig := findViewConfig(configs, names[0], names[1])
 		if viewConfig == nil {
 			logrus.Error("Not found")
-			return
+			os.Exit(1)
 		}
 
 		params, err := loadParamFile()
 		if err != nil {
 			logrus.Errorf("%s", err.Error())
-			return
+			os.Exit(1)
 		}
 
 		q, err := viewConfig.QueryWithParam(params)
 		if err != nil {
 			logrus.Errorf("%s", err.Error())
-			return
+			os.Exit(1)
 		}
 
 		fmt.Print(q)
