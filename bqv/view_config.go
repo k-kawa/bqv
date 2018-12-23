@@ -105,7 +105,8 @@ func CreateViewConfigsFromDatasetDir(dir string) ([]*ViewConfig, error) {
 	ret := make([]*ViewConfig, 0)
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
-		logrus.Panicf("Failed to list files in dir: %s", dir)
+		logrus.Errorf("Failed to list files in dir: %s", dir)
+		return nil, err
 	}
 
 	for _, f := range files {
@@ -114,7 +115,8 @@ func CreateViewConfigsFromDatasetDir(dir string) ([]*ViewConfig, error) {
 		}
 		err := createViewConfigsFromViewDir(filepath.Join(dir, f.Name()), &ret, f.Name())
 		if err != nil {
-			logrus.Panicf("Failed to readViews: %s", err.Error())
+			logrus.Errorf("Failed to create views in the dir(%s): %s", filepath.Join(dir, f.Name()), err.Error())
+			// Keep creating ViewConfigs in the next dir instead of returning err.
 		}
 	}
 
@@ -124,7 +126,8 @@ func CreateViewConfigsFromDatasetDir(dir string) ([]*ViewConfig, error) {
 func createViewConfigsFromViewDir(dir string, ret *[]*ViewConfig, datasetName string) error {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
-		logrus.Panicf("Failed to list files in dir: %s", dir)
+		logrus.Errorf("Failed to list files in dir: %s", dir)
+		return err
 	}
 
 	for _, f := range files {
@@ -153,7 +156,7 @@ func createViewConfigFromQueryFile(datasetName, viewName, queryFileName string) 
 
 	queryFile, err := ioutil.ReadFile(queryFileName)
 	if err != nil {
-		logrus.Panicf("Failed to open query file(%s): %s", queryFileName, err.Error())
+		logrus.Errorf("Failed to open query file(%s): %s", queryFileName, err.Error())
 		return nil, err
 	}
 
