@@ -15,36 +15,49 @@
 package cmd
 
 import (
-	"fmt"
+	"context"
+	"os"
 
+	"cloud.google.com/go/bigquery"
+	"github.com/k-kawa/bqv/bqv"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 // destroyCmd represents the destroy command
 var destroyCmd = &cobra.Command{
 	Use:   "destroy",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Destroy the views",
+	Long:  `Destroy the views`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("destroy called")
+		configs, err := bqv.CreateViewConfigsFromDatasetDir(baseDir)
+		if err != nil {
+			logrus.Errorf("Failed to read views: %s", err.Error())
+			os.Exit(1)
+		}
+		ctx := context.Background()
+		client, err := bigquery.NewClient(ctx, projectID)
+		if err != nil {
+			logrus.Errorf("Failed to create bigquery client: %s", err.Error())
+			os.Exit(1)
+		}
+		errCount := 0
+		for _, config := range configs {
+			if _, err = config.DeleteIfExist(ctx, client); err != nil {
+				logrus.Errorf("Failed to delete a view %s.%s: %s", config.DatasetName, config.ViewName, err.Error())
+				errCount += 1
+			} else {
+				logrus.Printf("Deleting view %s.%s", config.DatasetName, config.ViewName)
+			}
+		}
+		if errCount > 0 {
+			logrus.Errorf("Some views might get deleted but %d errors occured", errCount)
+			os.Exit(1)
+		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(destroyCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// destroyCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// destroyCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	destroyCmd.PersistentFlags().StringVar(&projectID, "projectID", "", "GCP project name")
 }
