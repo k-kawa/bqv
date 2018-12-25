@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -27,7 +28,8 @@ var planCmd = &cobra.Command{
 	Long:  `Show execution plan. bqv plan describe what's going to happen if you you execute bqv apply.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// TODO
-		fmt.Println("plan called")
+		fmt.Println("plan called but not inplemented yet.")
+		os.Exit(1)
 	},
 }
 
