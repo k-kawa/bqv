@@ -24,8 +24,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var projectID string
-
 // applyCmd represents the apply command
 var applyCmd = &cobra.Command{
 	Use:   "apply",
