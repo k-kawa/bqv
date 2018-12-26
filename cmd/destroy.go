@@ -24,49 +24,40 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// applyCmd represents the apply command
-var applyCmd = &cobra.Command{
-	Use:   "apply",
-	Short: "Apply the views",
-	Long:  `Apply the views`,
+// destroyCmd represents the destroy command
+var destroyCmd = &cobra.Command{
+	Use:   "destroy",
+	Short: "Destroy the views",
+	Long:  `Destroy the views`,
 	Run: func(cmd *cobra.Command, args []string) {
 		configs, err := bqv.CreateViewConfigsFromDatasetDir(baseDir)
 		if err != nil {
 			logrus.Errorf("Failed to read views: %s", err.Error())
 			os.Exit(1)
 		}
-
-		params, err := loadParamFile()
-		if err != nil {
-			logrus.Errorf("Failed to read parameteer file: %s", err.Error())
-			os.Exit(1)
-		}
-
 		ctx := context.Background()
-
 		client, err := bigquery.NewClient(ctx, projectID)
 		if err != nil {
 			logrus.Errorf("Failed to create bigquery client: %s", err.Error())
 			os.Exit(1)
 		}
-
 		errCount := 0
 		for _, config := range configs {
-			if _, err = config.Apply(ctx, client, params); err != nil {
-				logrus.Errorf("Failed to create view %s.%s: %s", config.DatasetName, config.ViewName, err.Error())
+			if _, err = config.DeleteIfExist(ctx, client); err != nil {
+				logrus.Errorf("Failed to delete a view %s.%s: %s", config.DatasetName, config.ViewName, err.Error())
 				errCount += 1
+			} else {
+				logrus.Printf("Deleting view %s.%s", config.DatasetName, config.ViewName)
 			}
 		}
-
 		if errCount > 0 {
-			logrus.Errorf("Some views might get updated but %d errors occured", errCount)
+			logrus.Errorf("Some views might get deleted but %d errors occured", errCount)
 			os.Exit(1)
 		}
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(applyCmd)
-
-	applyCmd.PersistentFlags().StringVar(&projectID, "projectID", "", "GCP project name")
+	rootCmd.AddCommand(destroyCmd)
+	destroyCmd.PersistentFlags().StringVar(&projectID, "projectID", "", "GCP project name")
 }

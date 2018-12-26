@@ -51,6 +51,13 @@ INFO[0001] Creating view(your_dataset.your_view)
 bra bra bra ....
 ```
 
+Destroy all the views in the GCP project with `bqv destroy` command.
+
+```sh
+bqv destroy --projectID=your_project
+INFO[0001] Deleting view your_dataset.your_view
+```
+
 ## With parameter
 
 You can use the `query.sql` file as a template and replace the placeholders in it when you run `bqv apply`.
