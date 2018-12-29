@@ -23,6 +23,13 @@ type ViewConfig struct {
 	DatasetName string
 }
 
+type ViewDiff struct {
+	ViewName     string
+	DatasetName  string
+	OldViewQuery string
+	NewViewQuery string
+}
+
 func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params map[string]string) (bool, error) {
 	dataset := client.Dataset(v.DatasetName)
 
@@ -99,6 +106,45 @@ func (v *ViewConfig) QueryWithParam(params map[string]string) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+func (v *ViewConfig) Diff(ctx context.Context, client *bigquery.Client, params map[string](string)) (*ViewDiff, error) {
+	q, err := v.QueryWithParam(params)
+	if err != nil {
+		logrus.Errorf("Failed to get query: %s", err.Error())
+		return nil, err
+	}
+
+	dataset := client.Dataset(v.DatasetName)
+	if _, err = dataset.Metadata(ctx); err != nil && hasStatusCode(err, http.StatusNotFound) {
+		return &ViewDiff{
+			ViewName:     v.ViewName,
+			DatasetName:  v.DatasetName,
+			OldViewQuery: "",
+			NewViewQuery: q,
+		}, nil
+	}
+
+	view := client.Dataset(v.DatasetName).Table(v.ViewName)
+
+	m, err := view.Metadata(ctx)
+	if err != nil && hasStatusCode(err, http.StatusNotFound) {
+		return &ViewDiff{
+			ViewName:     v.ViewName,
+			DatasetName:  v.DatasetName,
+			OldViewQuery: "",
+			NewViewQuery: q,
+		}, nil
+	}
+	if strings.Compare(m.ViewQuery, q) != 0 {
+		return &ViewDiff{
+			ViewName:     v.ViewName,
+			DatasetName:  v.DatasetName,
+			OldViewQuery: m.ViewQuery,
+			NewViewQuery: q,
+		}, nil
+	}
+	return nil, nil
 }
 
 func CreateViewConfigsFromDatasetDir(dir string) ([]*ViewConfig, error) {
