@@ -15,9 +15,13 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 
+	"cloud.google.com/go/bigquery"
+	"github.com/k-kawa/bqv/bqv"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -27,9 +31,37 @@ var planCmd = &cobra.Command{
 	Short: "show execution plan.",
 	Long:  `Show execution plan. bqv plan describe what's going to happen if you you execute bqv apply.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO
-		fmt.Println("plan called but not inplemented yet.")
-		os.Exit(1)
+		params, err := loadParamFile()
+		if err != nil {
+			logrus.Errorf("Failed to read parameteer file: %s", err.Error())
+			os.Exit(1)
+		}
+
+		ctx := context.Background()
+
+		client, err := bigquery.NewClient(ctx, projectID)
+		if err != nil {
+			logrus.Errorf("Failed to create bigquery client: %s", err.Error())
+			os.Exit(1)
+		}
+
+		configs, err := bqv.CreateViewConfigsFromDatasetDir(baseDir)
+		if err != nil {
+			logrus.Errorf("Failed to read views: %s", err.Error())
+			os.Exit(1)
+		}
+
+		for _, config := range configs {
+			diff, err := config.Diff(ctx, client, params)
+			if err != nil {
+				logrus.Errorf("Failed to create diff of view(%s.%s): %s", config.DatasetName, config.ViewName, err.Error())
+				continue
+			}
+			if diff == nil {
+				continue
+			}
+			fmt.Printf("## %s.%s\n### Old\n```sql\n%s\n```\n### New\n```sql\n%s\n```", diff.DatasetName, diff.ViewName, diff.OldViewQuery, diff.NewViewQuery)
+		}
 	},
 }
 
@@ -41,6 +73,7 @@ func init() {
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	// planCmd.PersistentFlags().String("foo", "", "A help for foo")
+	planCmd.PersistentFlags().StringVar(&projectID, "projectID", "", "GCP project name")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
