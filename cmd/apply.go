@@ -24,6 +24,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var dryRun bool
+
 // applyCmd represents the apply command
 var applyCmd = &cobra.Command{
 	Use:   "apply",
@@ -51,10 +53,15 @@ var applyCmd = &cobra.Command{
 		}
 
 		errCount := 0
-		for _, config := range configs {
-			if _, err = config.Apply(ctx, client, params); err != nil {
-				logrus.Errorf("Failed to create view %s.%s: %s", config.DatasetName, config.ViewName, err.Error())
-				errCount += 1
+		if dryRun {
+			logrus.Error("Dry run mode has not been implemented yet.")
+			os.Exit(1)
+		} else {
+			for _, config := range configs {
+				if _, err = config.Apply(ctx, client, params); err != nil {
+					logrus.Errorf("Failed to create view %s.%s: %s", config.DatasetName, config.ViewName, err.Error())
+					errCount++
+				}
 			}
 		}
 
@@ -69,4 +76,5 @@ func init() {
 	rootCmd.AddCommand(applyCmd)
 
 	applyCmd.PersistentFlags().StringVar(&projectID, "projectID", "", "GCP project name")
+	applyCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Dry run")
 }
