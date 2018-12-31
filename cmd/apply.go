@@ -62,7 +62,7 @@ var applyCmd = &cobra.Command{
 			}
 		} else {
 			for _, config := range configs {
-				if _, err = config.Apply(ctx, client, params); err != nil {
+				if err = config.Apply(ctx, client, params); err != nil {
 					logrus.Errorf("Failed to create view %s.%s: %s", config.DatasetName, config.ViewName, err.Error())
 					errCount++
 				}

@@ -30,7 +30,7 @@ type ViewDiff struct {
 	NewViewQuery string
 }
 
-func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params map[string]string) (bool, error) {
+func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params map[string]string) error {
 	dataset := client.Dataset(v.DatasetName)
 
 	// check if the dataset exists.
@@ -42,7 +42,7 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 		})
 		if err != nil {
 			logrus.Errorf("Failed to create dataset: %s", err.Error())
-			return false, err
+			return err
 		}
 	}
 
@@ -51,7 +51,7 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 	if err == nil {
 		if strings.Compare(m.ViewQuery, v.Query) == 0 {
 			logrus.Infof("Skipping View(%s.%s). It exists and its query hasn't changed.", view.DatasetID, view.TableID)
-			return false, nil
+			return nil
 		}
 		logrus.Infof("View(%s.%s) existed. Deleting it...", view.DatasetID, view.TableID)
 		view.Delete(ctx)
@@ -61,7 +61,7 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 	q, err := v.QueryWithParam(params)
 	if err != nil {
 		logrus.Errorf("Failed to execute template: %s", err.Error())
-		return false, err
+		return err
 	}
 
 	err = view.Create(ctx, &bigquery.TableMetadata{
@@ -71,9 +71,9 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 	})
 	if err != nil {
 		logrus.Errorf("Faieled to create view: %s", err.Error())
-		return false, err
+		return err
 	}
-	return true, nil
+	return nil
 }
 
 func (v *ViewConfig) DryRun(ctx context.Context, client *bigquery.Client, params map[string]string) error {
