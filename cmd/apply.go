@@ -54,11 +54,15 @@ var applyCmd = &cobra.Command{
 
 		errCount := 0
 		if dryRun {
-			logrus.Error("Dry run mode has not been implemented yet.")
-			os.Exit(1)
+			for _, config := range configs {
+				if err = config.DryRun(ctx, client, params); err != nil {
+					logrus.Errorf("Failed to create view %s.%s (dry-run): %s", config.DatasetName, config.ViewName, err.Error())
+					errCount++
+				}
+			}
 		} else {
 			for _, config := range configs {
-				if _, err = config.Apply(ctx, client, params); err != nil {
+				if err = config.Apply(ctx, client, params); err != nil {
 					logrus.Errorf("Failed to create view %s.%s: %s", config.DatasetName, config.ViewName, err.Error())
 					errCount++
 				}
@@ -66,7 +70,7 @@ var applyCmd = &cobra.Command{
 		}
 
 		if errCount > 0 {
-			logrus.Errorf("Some views might get updated but %d errors occured", errCount)
+			logrus.Errorf("%d errors occured", errCount)
 			os.Exit(1)
 		}
 	},

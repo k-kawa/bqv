@@ -30,7 +30,7 @@ type ViewDiff struct {
 	NewViewQuery string
 }
 
-func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params map[string]string) (bool, error) {
+func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params map[string]string) error {
 	dataset := client.Dataset(v.DatasetName)
 
 	// check if the dataset exists.
@@ -42,7 +42,7 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 		})
 		if err != nil {
 			logrus.Errorf("Failed to create dataset: %s", err.Error())
-			return false, err
+			return err
 		}
 	}
 
@@ -51,7 +51,7 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 	if err == nil {
 		if strings.Compare(m.ViewQuery, v.Query) == 0 {
 			logrus.Infof("Skipping View(%s.%s). It exists and its query hasn't changed.", view.DatasetID, view.TableID)
-			return false, nil
+			return nil
 		}
 		logrus.Infof("View(%s.%s) existed. Deleting it...", view.DatasetID, view.TableID)
 		view.Delete(ctx)
@@ -61,7 +61,7 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 	q, err := v.QueryWithParam(params)
 	if err != nil {
 		logrus.Errorf("Failed to execute template: %s", err.Error())
-		return false, err
+		return err
 	}
 
 	err = view.Create(ctx, &bigquery.TableMetadata{
@@ -71,9 +71,62 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 	})
 	if err != nil {
 		logrus.Errorf("Faieled to create view: %s", err.Error())
-		return false, err
+		return err
 	}
-	return true, nil
+	return nil
+}
+
+func (v *ViewConfig) DryRun(ctx context.Context, client *bigquery.Client, params map[string]string) error {
+	m, err := v.GetViewMetaDataIfExists(ctx, client)
+	if err != nil {
+		logrus.Errorf("Failed to get the metadata of this table: %s", err.Error())
+		return err
+	}
+	q, err := v.QueryWithParam(params)
+	if err != nil {
+		logrus.Errorf("Failed to create query: %s", err.Error())
+		return err
+	}
+	if strings.Compare(m.ViewQuery, q) == 0 {
+		logrus.Infof("View(%s.%s) won't change", v.DatasetName, v.ViewName)
+		return nil
+	}
+
+	query := client.Query(q)
+	query.DryRun = true
+	job, err := query.Run(ctx)
+	if err != nil {
+		logrus.Errorf("Failed to run the query: %s", err.Error())
+		logrus.Errorf("query: %s", q)
+		return err
+	}
+
+	// https://github.com/GoogleCloudPlatform/golang-samples/blob/master/bigquery/snippets/snippet.go#L1106
+	// Dry run is not asynchronous, so get the latest status and statistics.
+	jobStatus := job.LastStatus()
+	if jobStatus.Err() != nil {
+		logrus.Errorf("Dry run failed: %s", jobStatus.Err().Error())
+		return jobStatus.Err()
+	}
+
+	logrus.Infof("View(%s.%s) seems OK", v.DatasetName, v.ViewName)
+	return nil
+}
+
+func (v *ViewConfig) GetViewMetaDataIfExists(ctx context.Context, client *bigquery.Client) (*bigquery.TableMetadata, error) {
+	dataset := client.Dataset(v.DatasetName)
+	_, err := dataset.Metadata(ctx)
+	if err != nil && hasStatusCode(err, http.StatusNotFound) {
+		logrus.Debugf("Dataset(%s) didn't exist.", v.DatasetName)
+		return nil, nil
+	}
+	view := client.Dataset(v.DatasetName).Table(v.ViewName)
+	m, err := view.Metadata(ctx)
+	if err == nil {
+		logrus.Debugf("View(%s.%s) was found", v.DatasetName, v.ViewName)
+		return m, nil
+	}
+	return nil, nil
 }
 
 func (v *ViewConfig) DeleteIfExist(ctx context.Context, client *bigquery.Client) (bool, error) {
