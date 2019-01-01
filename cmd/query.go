@@ -29,8 +29,8 @@ import (
 // queryCmd represents the query command
 var queryCmd = &cobra.Command{
 	Use:   "query",
-	Short: "Query",
-	Long:  ``,
+	Short: "Query show the SQL made from the SQL template and the paramter file.",
+	Long:  `Query show the SQL made from the SQL template and the paramter file.`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			return errors.New("dataset.view name")

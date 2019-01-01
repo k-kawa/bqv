@@ -17,12 +17,14 @@ import (
 	"cloud.google.com/go/bigquery"
 )
 
+// ViewConfig is...
 type ViewConfig struct {
 	Query       string
 	ViewName    string
 	DatasetName string
 }
 
+// ViewDiff is...
 type ViewDiff struct {
 	ViewName     string
 	DatasetName  string
@@ -30,7 +32,9 @@ type ViewDiff struct {
 	NewViewQuery string
 }
 
-func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params map[string]string) error {
+// Apply creates the view or updates it when it existed.
+// Apply returns (true, nil) if the view changed and (false ,nil) if the view didn't change
+func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params map[string]string) (bool, error) {
 	dataset := client.Dataset(v.DatasetName)
 
 	// check if the dataset exists.
@@ -42,7 +46,7 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 		})
 		if err != nil {
 			logrus.Errorf("Failed to create dataset: %s", err.Error())
-			return err
+			return false, err
 		}
 	}
 
@@ -51,7 +55,7 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 	if err == nil {
 		if strings.Compare(m.ViewQuery, v.Query) == 0 {
 			logrus.Infof("Skipping View(%s.%s). It exists and its query hasn't changed.", view.DatasetID, view.TableID)
-			return nil
+			return false, nil
 		}
 		logrus.Infof("View(%s.%s) existed. Deleting it...", view.DatasetID, view.TableID)
 		view.Delete(ctx)
@@ -61,7 +65,7 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 	q, err := v.QueryWithParam(params)
 	if err != nil {
 		logrus.Errorf("Failed to execute template: %s", err.Error())
-		return err
+		return false, err
 	}
 
 	err = view.Create(ctx, &bigquery.TableMetadata{
@@ -70,26 +74,28 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 		UseStandardSQL: true,
 	})
 	if err != nil {
-		logrus.Errorf("Faieled to create view: %s", err.Error())
-		return err
+		logrus.Errorf("Failed to create view: %s", err.Error())
+		return false, err
 	}
-	return nil
+	return true, nil
 }
 
-func (v *ViewConfig) DryRun(ctx context.Context, client *bigquery.Client, params map[string]string) error {
-	m, err := v.GetViewMetaDataIfExists(ctx, client)
+// DryRun tests Query is valid by executing the query in dry-run mode.
+// DryRun returns true if the view might get created or updated when you call Apply and false if not.
+func (v *ViewConfig) DryRun(ctx context.Context, client *bigquery.Client, params map[string]string) (bool, error) {
+	m, err := v.getViewMetaDataIfExists(ctx, client)
 	if err != nil {
 		logrus.Errorf("Failed to get the metadata of this table: %s", err.Error())
-		return err
+		return false, err
 	}
 	q, err := v.QueryWithParam(params)
 	if err != nil {
 		logrus.Errorf("Failed to create query: %s", err.Error())
-		return err
+		return false, err
 	}
 	if strings.Compare(m.ViewQuery, q) == 0 {
 		logrus.Infof("View(%s.%s) won't change", v.DatasetName, v.ViewName)
-		return nil
+		return false, nil
 	}
 
 	query := client.Query(q)
@@ -98,7 +104,7 @@ func (v *ViewConfig) DryRun(ctx context.Context, client *bigquery.Client, params
 	if err != nil {
 		logrus.Errorf("Failed to run the query: %s", err.Error())
 		logrus.Errorf("query: %s", q)
-		return err
+		return false, err
 	}
 
 	// https://github.com/GoogleCloudPlatform/golang-samples/blob/master/bigquery/snippets/snippet.go#L1106
@@ -106,14 +112,14 @@ func (v *ViewConfig) DryRun(ctx context.Context, client *bigquery.Client, params
 	jobStatus := job.LastStatus()
 	if jobStatus.Err() != nil {
 		logrus.Errorf("Dry run failed: %s", jobStatus.Err().Error())
-		return jobStatus.Err()
+		return true, jobStatus.Err()
 	}
 
 	logrus.Infof("View(%s.%s) seems OK", v.DatasetName, v.ViewName)
-	return nil
+	return true, nil
 }
 
-func (v *ViewConfig) GetViewMetaDataIfExists(ctx context.Context, client *bigquery.Client) (*bigquery.TableMetadata, error) {
+func (v *ViewConfig) getViewMetaDataIfExists(ctx context.Context, client *bigquery.Client) (*bigquery.TableMetadata, error) {
 	dataset := client.Dataset(v.DatasetName)
 	_, err := dataset.Metadata(ctx)
 	if err != nil && hasStatusCode(err, http.StatusNotFound) {
@@ -129,6 +135,8 @@ func (v *ViewConfig) GetViewMetaDataIfExists(ctx context.Context, client *bigque
 	return nil, nil
 }
 
+// DeleteIfExist deletes the view if it exists.
+// DeleteIfExist returns true if the view got deleted and false if not.
 func (v *ViewConfig) DeleteIfExist(ctx context.Context, client *bigquery.Client) (bool, error) {
 	dataset := client.Dataset(v.DatasetName)
 	_, err := dataset.Metadata(ctx)
@@ -147,6 +155,7 @@ func (v *ViewConfig) DeleteIfExist(ctx context.Context, client *bigquery.Client)
 	return false, nil
 }
 
+// QueryWithParam returns the SQL made of the template Query and the given params.
 func (v *ViewConfig) QueryWithParam(params map[string]string) (string, error) {
 	t, err := template.New("q").Parse(v.Query)
 	if err != nil {
@@ -161,6 +170,7 @@ func (v *ViewConfig) QueryWithParam(params map[string]string) (string, error) {
 	return buf.String(), nil
 }
 
+// Diff returns ViewDiff instance if the actual ViewQuery and the SQL made from Query and params are different.
 func (v *ViewConfig) Diff(ctx context.Context, client *bigquery.Client, params map[string](string)) (*ViewDiff, error) {
 	q, err := v.QueryWithParam(params)
 	if err != nil {
@@ -200,6 +210,7 @@ func (v *ViewConfig) Diff(ctx context.Context, client *bigquery.Client, params m
 	return nil, nil
 }
 
+// CreateViewConfigsFromDatasetDir creates ViewConfig objects defined in the given dir directory.
 func CreateViewConfigsFromDatasetDir(dir string) ([]*ViewConfig, error) {
 	ret := make([]*ViewConfig, 0)
 	files, err := ioutil.ReadDir(dir)

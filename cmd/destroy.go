@@ -27,8 +27,8 @@ import (
 // destroyCmd represents the destroy command
 var destroyCmd = &cobra.Command{
 	Use:   "destroy",
-	Short: "Destroy the views",
-	Long:  `Destroy the views`,
+	Short: "Destroy deletes all the views you defined.",
+	Long:  `Destroy deletes all the views you defined`,
 	Run: func(cmd *cobra.Command, args []string) {
 		configs, err := bqv.CreateViewConfigsFromDatasetDir(baseDir)
 		if err != nil {
