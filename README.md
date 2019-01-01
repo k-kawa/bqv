@@ -36,6 +36,15 @@ SELECT 1 AS one
 EOF
 ```
 
+(Optional) Make an `meta.json` file in it, which is going to use to create the view.
+Now supported metadata is only view description.
+
+```json
+{
+    "description": "hogehoge"
+}
+```
+
 List the view names which are going to manage with `bqv list` command.
 
 ```sh
