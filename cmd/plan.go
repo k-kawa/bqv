@@ -60,7 +60,7 @@ var planCmd = &cobra.Command{
 			if diff == nil {
 				continue
 			}
-			fmt.Printf("## %s.%s\n### Old\n```sql\n%s\n```\n### New\n```sql\n%s\n```", diff.DatasetName, diff.ViewName, diff.OldViewQuery, diff.NewViewQuery)
+			fmt.Printf("## %s.%s\n### Old\nDescription: %s\n```sql\n%s\n```\n### New\nDescription: %s\n```sql\n%s\n```", diff.DatasetName, diff.ViewName, diff.OldDescription, diff.OldViewQuery, diff.NewDescription, diff.NewViewQuery)
 		}
 	},
 }
