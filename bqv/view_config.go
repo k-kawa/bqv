@@ -3,6 +3,7 @@ package bqv
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -22,14 +23,17 @@ type ViewConfig struct {
 	Query       string
 	ViewName    string
 	DatasetName string
+	Description string
 }
 
 // ViewDiff is...
 type ViewDiff struct {
-	ViewName     string
-	DatasetName  string
-	OldViewQuery string
-	NewViewQuery string
+	ViewName       string
+	DatasetName    string
+	OldDescription string
+	NewDescription string
+	OldViewQuery   string
+	NewViewQuery   string
 }
 
 // Apply creates the view or updates it when it existed.
@@ -70,6 +74,7 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 
 	err = view.Create(ctx, &bigquery.TableMetadata{
 		Name:           v.ViewName,
+		Description:    v.Description,
 		ViewQuery:      q,
 		UseStandardSQL: true,
 	})
@@ -181,30 +186,36 @@ func (v *ViewConfig) Diff(ctx context.Context, client *bigquery.Client, params m
 	dataset := client.Dataset(v.DatasetName)
 	if _, err = dataset.Metadata(ctx); err != nil && hasStatusCode(err, http.StatusNotFound) {
 		return &ViewDiff{
-			ViewName:     v.ViewName,
-			DatasetName:  v.DatasetName,
-			OldViewQuery: "",
-			NewViewQuery: q,
+			ViewName:       v.ViewName,
+			DatasetName:    v.DatasetName,
+			OldDescription: "",
+			NewDescription: v.Description,
+			OldViewQuery:   "",
+			NewViewQuery:   q,
 		}, nil
 	}
 
 	view := client.Dataset(v.DatasetName).Table(v.ViewName)
-
 	m, err := view.Metadata(ctx)
+
 	if err != nil && hasStatusCode(err, http.StatusNotFound) {
 		return &ViewDiff{
-			ViewName:     v.ViewName,
-			DatasetName:  v.DatasetName,
-			OldViewQuery: "",
-			NewViewQuery: q,
+			ViewName:       v.ViewName,
+			DatasetName:    v.DatasetName,
+			OldDescription: "",
+			NewDescription: v.Description,
+			OldViewQuery:   "",
+			NewViewQuery:   q,
 		}, nil
 	}
-	if strings.Compare(m.ViewQuery, q) != 0 {
+	if (strings.Compare(m.ViewQuery, q) != 0) || (strings.Compare(m.Description, v.Description) != 0) {
 		return &ViewDiff{
-			ViewName:     v.ViewName,
-			DatasetName:  v.DatasetName,
-			OldViewQuery: m.ViewQuery,
-			NewViewQuery: q,
+			ViewName:       v.ViewName,
+			DatasetName:    v.DatasetName,
+			OldDescription: m.Description,
+			NewDescription: v.Description,
+			OldViewQuery:   m.ViewQuery,
+			NewViewQuery:   q,
 		}, nil
 	}
 	return nil, nil
@@ -244,7 +255,7 @@ func createViewConfigsFromViewDir(dir string, ret *[]*ViewConfig, datasetName st
 		if !f.IsDir() {
 			continue
 		}
-		viewConfig, err := createViewConfigFromQueryFile(datasetName, f.Name(), filepath.Join(dir, f.Name(), "query.sql"))
+		viewConfig, err := createViewConfigFromQueryFile(datasetName, f.Name(), filepath.Join(dir, f.Name(), "query.sql"), filepath.Join(dir, f.Name(), "meta.json"))
 		if err != nil {
 			return err
 		}
@@ -258,9 +269,9 @@ func createViewConfigsFromViewDir(dir string, ret *[]*ViewConfig, datasetName st
 	return nil
 }
 
-func createViewConfigFromQueryFile(datasetName, viewName, queryFileName string) (*ViewConfig, error) {
+func createViewConfigFromQueryFile(datasetName, viewName, queryFileName, metadataFileName string) (*ViewConfig, error) {
 	if _, err := os.Stat(queryFileName); os.IsNotExist(err) {
-		logrus.Debugf("File not found. skip %s.%s", datasetName, viewName)
+		logrus.Debugf("Query File not found. skip %s.%s", datasetName, viewName)
 		return nil, nil
 	}
 
@@ -272,9 +283,26 @@ func createViewConfigFromQueryFile(datasetName, viewName, queryFileName string) 
 
 	query := string(queryFile[:])
 
+	var metadata map[string]interface{}
+	if _, err := os.Stat(metadataFileName); os.IsNotExist(err) {
+		logrus.Debugf("Metadata file not found. skip load metadata from file: %s", metadataFileName)
+	} else {
+		metadataFile, err := ioutil.ReadFile(metadataFileName)
+		if err != nil {
+			logrus.Errorf("Failed to open metadata file(%s): %s", metadataFileName, err.Error())
+			return nil, err
+		}
+		if err := json.Unmarshal(metadataFile, &metadata); err != nil {
+			logrus.Errorf("Failed to extract metadata json data(%s): %s", metadataFileName, err.Error())
+			return nil, err
+		}
+		logrus.Debugf("metadata:%s", metadata)
+	}
+
 	return &ViewConfig{
 		DatasetName: datasetName,
 		ViewName:    viewName,
+		Description: metadata["description"].(string),
 		Query:       query,
 	}, nil
 }
