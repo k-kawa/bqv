@@ -29,8 +29,8 @@ var dryRun bool
 // applyCmd represents the apply command
 var applyCmd = &cobra.Command{
 	Use:   "apply",
-	Short: "Apply the views",
-	Long:  `Apply the views`,
+	Short: "Apply builds and updates thew views you defined.",
+	Long:  `Apply builds and updates thew views you defined.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		configs, err := bqv.CreateViewConfigsFromDatasetDir(baseDir)
 		if err != nil {
@@ -55,14 +55,14 @@ var applyCmd = &cobra.Command{
 		errCount := 0
 		if dryRun {
 			for _, config := range configs {
-				if err = config.DryRun(ctx, client, params); err != nil {
+				if _, err = config.DryRun(ctx, client, params); err != nil {
 					logrus.Errorf("Failed to create view %s.%s (dry-run): %s", config.DatasetName, config.ViewName, err.Error())
 					errCount++
 				}
 			}
 		} else {
 			for _, config := range configs {
-				if err = config.Apply(ctx, client, params); err != nil {
+				if _, err = config.Apply(ctx, client, params); err != nil {
 					logrus.Errorf("Failed to create view %s.%s: %s", config.DatasetName, config.ViewName, err.Error())
 					errCount++
 				}
