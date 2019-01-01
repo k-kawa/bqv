@@ -1,4 +1,4 @@
-// Copyright © 2018 Kohei Kawasaki <mynameiskawasaq@gmail.com>
+// Copyright © 2019 Kohei Kawasaki <mynameiskawasaq@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,8 +28,8 @@ import (
 // planCmd represents the plan command
 var planCmd = &cobra.Command{
 	Use:   "plan",
-	Short: "show execution plan.",
-	Long:  `Show execution plan. bqv plan describe what's going to happen if you you execute bqv apply.`,
+	Short: "Plan shows what's going to happen if you run Apply.",
+	Long:  `Plan shows what's going to happen if you run Apply.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		params, err := loadParamFile()
 		if err != nil {

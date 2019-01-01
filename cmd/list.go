@@ -1,4 +1,4 @@
-// Copyright © 2018 Kohei Kawasaki <mynameiskawasaq@gmail.com>
+// Copyright © 2019 Kohei Kawasaki <mynameiskawasaq@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,8 +26,8 @@ import (
 // listCmd represents the list command
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List views to be managed.",
-	Long:  `List views to be managed in (dataset).(view) format.`,
+	Short: "List shows all the views to be managed.",
+	Long:  `List shows all the views to be managed in (dataset).(view) format.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		configs, err := bqv.CreateViewConfigsFromDatasetDir(baseDir)
 		if err != nil {

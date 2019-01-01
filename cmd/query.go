@@ -1,4 +1,4 @@
-// Copyright © 2018 Kohei Kawasaki <mynameiskawasaq@gmail.com>
+// Copyright © 2019 Kohei Kawasaki <mynameiskawasaq@gmail.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,8 +29,8 @@ import (
 // queryCmd represents the query command
 var queryCmd = &cobra.Command{
 	Use:   "query",
-	Short: "Query",
-	Long:  ``,
+	Short: "Query show the SQL made from the SQL template and the paramter file.",
+	Long:  `Query show the SQL made from the SQL template and the paramter file.`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			return errors.New("dataset.view name")
