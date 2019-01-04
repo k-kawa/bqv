@@ -24,6 +24,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var all bool
+
 // destroyCmd represents the destroy command
 var destroyCmd = &cobra.Command{
 	Use:   "destroy",
@@ -41,13 +43,20 @@ var destroyCmd = &cobra.Command{
 			logrus.Errorf("Failed to create bigquery client: %s", err.Error())
 			os.Exit(1)
 		}
+
 		errCount := 0
-		for _, config := range configs {
-			if _, err = config.DeleteIfExist(ctx, client); err != nil {
-				logrus.Errorf("Failed to delete a view %s.%s: %s", config.DatasetName, config.ViewName, err.Error())
-				errCount += 1
-			} else {
-				logrus.Printf("Deleting view %s.%s", config.DatasetName, config.ViewName)
+
+		if all {
+			logrus.Errorf("Not implemented yet")
+			os.Exit(1)
+		} else {
+			for _, config := range configs {
+				if _, err = config.DeleteIfExist(ctx, client); err != nil {
+					logrus.Errorf("Failed to delete a view %s.%s: %s", config.DatasetName, config.ViewName, err.Error())
+					errCount++
+				} else {
+					logrus.Printf("Deleting view %s.%s", config.DatasetName, config.ViewName)
+				}
 			}
 		}
 		if errCount > 0 {
@@ -60,4 +69,5 @@ var destroyCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(destroyCmd)
 	destroyCmd.PersistentFlags().StringVar(&projectID, "projectID", "", "GCP project name")
+	destroyCmd.PersistentFlags().BoolVar(&all, "all", false, "Delete all the views which are not defined.")
 }
