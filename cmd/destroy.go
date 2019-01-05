@@ -47,8 +47,14 @@ var destroyCmd = &cobra.Command{
 		errCount := 0
 
 		if all {
-			logrus.Errorf("Not implemented yet")
-			os.Exit(1)
+			deleted, err := bqv.DeleteAllViews(ctx, client)
+			if err != nil {
+				logrus.Errorf("Error occured: %s", err.Error())
+				if deleted {
+					logrus.Errorf("Some views have already deleted")
+				}
+				os.Exit(1)
+			}
 		} else {
 			for _, config := range configs {
 				if _, err = config.DeleteIfExist(ctx, client); err != nil {
