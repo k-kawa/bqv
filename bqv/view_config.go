@@ -299,10 +299,16 @@ func createViewConfigFromQueryFile(datasetName, viewName, queryFileName, metadat
 		logrus.Debugf("metadata:%s", metadata)
 	}
 
+	description := string("")
+
+	if metadata["description"] != nil {
+		description = metadata["description"].(string)
+	}
+
 	return &ViewConfig{
 		DatasetName: datasetName,
 		ViewName:    viewName,
-		Description: metadata["description"].(string),
+		Description: description,
 		Query:       query,
 	}, nil
 }
