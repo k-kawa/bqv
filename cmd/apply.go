@@ -25,6 +25,7 @@ import (
 )
 
 var dryRun bool
+var deleteIfNotDefined bool
 
 // applyCmd represents the apply command
 var applyCmd = &cobra.Command{
@@ -60,12 +61,20 @@ var applyCmd = &cobra.Command{
 					errCount++
 				}
 			}
+			if deleteIfNotDefined {
+				logrus.Error("--delte-if-not-defined option's not implemented yet")
+				os.Exit(1)
+			}
 		} else {
 			for _, config := range configs {
 				if _, err = config.Apply(ctx, client, params); err != nil {
 					logrus.Errorf("Failed to create view %s.%s: %s", config.DatasetName, config.ViewName, err.Error())
 					errCount++
 				}
+			}
+			if deleteIfNotDefined {
+				logrus.Error("--delte-if-not-defined option's not implemented yet")
+				os.Exit(1)
 			}
 		}
 
@@ -81,4 +90,5 @@ func init() {
 
 	applyCmd.PersistentFlags().StringVar(&projectID, "projectID", "", "GCP project name")
 	applyCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Dry run")
+	applyCmd.PersistentFlags().BoolVar(&deleteIfNotDefined, "delete-if-not-defined", false, "Delete views if they're not defined")
 }
