@@ -25,23 +25,20 @@ type ViewConfig struct {
 	DatasetName      string
 	MetadataFromFile struct {
 		Description string `json:"description"`
-		Schema      struct {
-			Fields []struct {
-				Name        string `json:"name"`
-				Description string `json:"description,omitempty"`
-			} `json:"fields"`
+		Schema      []struct {
+			Name        string `json:"name"`
+			Description string `json:"description,omitempty"`
 		} `json:"schema"`
 	}
 }
 
 // ViewDiff is...
 type ViewDiff struct {
-	ViewName       string
-	DatasetName    string
-	OldDescription string
-	NewDescription string
-	OldViewQuery   string
-	NewViewQuery   string
+	ViewName           string
+	DatasetName        string
+	OldViewQuery       string
+	NewViewQuery       string
+	MetadataUpdateFlag bool
 }
 
 // Apply creates the view or updates it when it existed.
@@ -73,12 +70,15 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 	m, err := view.Metadata(ctx)
 
 	if err == nil { // skip updating view if no change
-		if strings.Compare(m.ViewQuery, v.Query) == 0 {
+		diff, err := v.Diff(ctx, client, params)
+		if err != nil {
+			logrus.Errorf("Failed to get diff of view(%s.%s): %s", diff.DatasetName, diff.ViewName, err.Error())
+		}
+		if diff == nil {
 			logrus.Infof("Skipping View(%s.%s). It exists and its query hasn't changed.", view.DatasetID, view.TableID)
 			return false, nil
 		}
 	} else { // create view if not exists
-		logrus.Infof("Creating or Updating view(%s.%s) ...", view.DatasetID, view.TableID)
 		err = view.Create(ctx, &bigquery.TableMetadata{
 			Name:           v.ViewName,
 			ViewQuery:      q,
@@ -95,10 +95,12 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 		}
 	}
 
+	logrus.Infof("Creating or Updating view(%s.%s) ...", view.DatasetID, view.TableID)
+
 	// parse metadata from file
 	if &v.MetadataFromFile != nil {
 		for _, field := range m.Schema {
-			for _, newValue := range v.MetadataFromFile.Schema.Fields {
+			for _, newValue := range v.MetadataFromFile.Schema {
 				if field.Name == newValue.Name {
 					field.Description = newValue.Description
 				}
@@ -221,20 +223,14 @@ func (v *ViewConfig) Diff(ctx context.Context, client *bigquery.Client, params m
 		return nil, err
 	}
 
-	newDesc := ""
-	if &v.MetadataFromFile.Description != nil {
-		newDesc = v.MetadataFromFile.Description
-	}
-
 	dataset := client.Dataset(v.DatasetName)
 	if _, err = dataset.Metadata(ctx); err != nil && hasStatusCode(err, http.StatusNotFound) {
 		return &ViewDiff{
-			ViewName:       v.ViewName,
-			DatasetName:    v.DatasetName,
-			OldDescription: "",
-			NewDescription: newDesc,
-			OldViewQuery:   "",
-			NewViewQuery:   q,
+			ViewName:           v.ViewName,
+			DatasetName:        v.DatasetName,
+			OldViewQuery:       "",
+			NewViewQuery:       q,
+			MetadataUpdateFlag: false,
 		}, nil
 	}
 
@@ -243,22 +239,36 @@ func (v *ViewConfig) Diff(ctx context.Context, client *bigquery.Client, params m
 
 	if err != nil && hasStatusCode(err, http.StatusNotFound) {
 		return &ViewDiff{
-			ViewName:       v.ViewName,
-			DatasetName:    v.DatasetName,
-			OldDescription: "",
-			NewDescription: v.MetadataFromFile.Description,
-			OldViewQuery:   "",
-			NewViewQuery:   q,
+			ViewName:           v.ViewName,
+			DatasetName:        v.DatasetName,
+			OldViewQuery:       "",
+			NewViewQuery:       q,
+			MetadataUpdateFlag: false,
 		}, nil
 	}
-	if (strings.Compare(m.ViewQuery, q) != 0) || (strings.Compare(m.Description, v.MetadataFromFile.Description) != 0) {
+
+	// parse metadata string from TableMetadata and file
+	newMetaByte := make([]byte, 0, 1024)
+	oldMetaByte := make([]byte, 0, 1024)
+	if &v.MetadataFromFile != nil {
+		oldMetaByte = append(oldMetaByte, m.Description...)
+		for _, value := range m.Schema {
+			oldMetaByte = append(oldMetaByte, value.Description...)
+		}
+		newMetaByte = append(newMetaByte, v.MetadataFromFile.Description...)
+		for _, value := range v.MetadataFromFile.Schema {
+			newMetaByte = append(newMetaByte, value.Description...)
+		}
+	}
+	logrus.Debugf("Old metadata string:%s", string(oldMetaByte))
+	logrus.Debugf("New metadata string:%s", string(newMetaByte))
+	if (strings.Compare(m.ViewQuery, q) != 0) || !(bytes.Equal(oldMetaByte, newMetaByte)) {
 		return &ViewDiff{
-			ViewName:       v.ViewName,
-			DatasetName:    v.DatasetName,
-			OldDescription: m.Description,
-			NewDescription: v.MetadataFromFile.Description,
-			OldViewQuery:   m.ViewQuery,
-			NewViewQuery:   q,
+			ViewName:           v.ViewName,
+			DatasetName:        v.DatasetName,
+			OldViewQuery:       m.ViewQuery,
+			NewViewQuery:       q,
+			MetadataUpdateFlag: !bytes.Equal(oldMetaByte, newMetaByte),
 		}, nil
 	}
 	return nil, nil
@@ -343,7 +353,7 @@ func createViewConfigFromQueryFile(datasetName, viewName, queryFileName, metadat
 			logrus.Errorf("JSON Unmarshal error: file(%s): %s", metadataFileName, err.Error())
 			return nil, err
 		}
-		logrus.Debugf("metadata:%s", vc.MetadataFromFile)
+		logrus.Debugf("metadata(%s.%s):%s", vc.DatasetName, vc.ViewName, vc.MetadataFromFile)
 	}
 
 	return vc, nil
