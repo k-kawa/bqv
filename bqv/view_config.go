@@ -366,3 +366,13 @@ func hasStatusCode(err error, code int) bool {
 	}
 	return false
 }
+
+// IsIncluded returns true if the given configs includes the view whose name is datasetName.viewName.
+func IsIncluded(configs []ViewConfig, datasetName, viewName string) bool {
+	for _, viewConfig := range configs {
+		if viewConfig.DatasetName == datasetName && viewConfig.ViewName == viewName {
+			return true
+		}
+	}
+	return false
+}
