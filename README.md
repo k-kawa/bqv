@@ -19,7 +19,6 @@ go install github.com/k-kawa/bqv
 
 Or you can use `bqv` as a Docker image which is available at [kkawa/bqv](https://cloud.docker.com/repository/docker/kkawa/bqv)
 
-
 # How to use
 
 Make a directory based on the names of the dataset and the view that you want to create.
@@ -37,13 +36,18 @@ EOF
 ```
 
 (Optional) You can also make a `meta.json` file in it to describe the meta data of the view.
-The supported option is only `description` the value of which is to be the description of it for now.
+The supported option is `description` and `schema` the value of which is to be the description of it for now.
 (We want to suport more. see the [issues](https://github.com/k-kawa/bqv/issues)
 
 ```sh
 $ cat <<EOF > your_dataset/your_view/meta.json
 {
-    "description": "this is my awesome view!"
+    "description": "this is my awesome view!",
+    "schema": [
+        {"name": "my_column_name_1", "description": "your column description 1!!"},
+        {"name": "my_column_name_2", "description": "your column description 2!!"},
+        {"name": "my_column_name_3", "description": "your column description 3!!"}
+    ]
 }
 EOF
 ```
@@ -91,4 +95,3 @@ EOF
 # Run bqv apply with the parameters.json
 $ bqv apply --paramFile=parameters.json
 ```
-

@@ -18,6 +18,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/k-kawa/bqv/bqv"
@@ -60,7 +62,16 @@ var planCmd = &cobra.Command{
 			if diff == nil {
 				continue
 			}
-			fmt.Printf("## %s.%s\n### Old\nDescription: %s\n```sql\n%s\n```\n### New\nDescription: %s\n```sql\n%s\n```", diff.DatasetName, diff.ViewName, diff.OldDescription, diff.OldViewQuery, diff.NewDescription, diff.NewViewQuery)
+			queryDiff := "A view query has no change."
+			if strings.Compare(diff.OldViewQuery, diff.NewViewQuery) != 0 {
+				queryDiff = "### Old\n```sql\n" + diff.OldViewQuery + "\n```\n### New\n```sql\n" + diff.NewViewQuery + "\n```\n"
+			}
+			fmt.Printf("## %s.%s\n%s\nmetadata update :%s\n",
+				diff.DatasetName,
+				diff.ViewName,
+				queryDiff,
+				strconv.FormatBool(diff.MetadataUpdateFlag),
+			)
 		}
 	},
 }
