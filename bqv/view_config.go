@@ -29,6 +29,7 @@ type ViewConfig struct {
 			Name        string `json:"name"`
 			Description string `json:"description,omitempty"`
 		} `json:"schema"`
+		Labels map[string]string `json:"labels,omitempty"`
 	}
 }
 
@@ -107,16 +108,22 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 			}
 		}
 		m.Description = v.MetadataFromFile.Description
+		m.Labels = v.MetadataFromFile.Labels
 	}
 
 	// update view
-	_, err = view.Update(ctx, bigquery.TableMetadataToUpdate{
+	tm := bigquery.TableMetadataToUpdate{
 		Name:         v.ViewName,
 		ViewQuery:    q,
 		UseLegacySQL: false,
 		Description:  m.Description,
 		Schema:       m.Schema,
-	}, m.ETag)
+	}
+	for key, value := range m.Labels {
+		tm.SetLabel(key, value)
+		logrus.Infof("labels update(%s:%s) ...", key, value)
+	}
+	_, err = view.Update(ctx, tm, m.ETag)
 	if err != nil {
 		logrus.Errorf("Failed to update view: %s", err.Error())
 		return false, err
