@@ -72,7 +72,6 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 	m, err := view.Metadata(ctx)
 
 	if err == nil { // skip updating view if no change
-		logrus.Debugf("metadata from api(%s.%s):%s", v.DatasetName, v.ViewName, m)
 		diff, err := v.Diff(ctx, client, params)
 		if err != nil {
 			logrus.Errorf("Failed to get diff of view(%s.%s): %s", diff.DatasetName, diff.ViewName, err.Error())
