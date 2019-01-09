@@ -36,7 +36,7 @@ EOF
 ```
 
 (Optional) You can also make a `meta.json` file in it to describe the meta data of the view.
-The supported option is `description` and `schema` the value of which is to be the description of it for now.
+The supported option is `description`, `schema` and `labels` the value of which is to be the description of it for now.
 (We want to suport more. see the [issues](https://github.com/k-kawa/bqv/issues)
 
 ```sh
@@ -47,7 +47,11 @@ $ cat <<EOF > your_dataset/your_view/meta.json
         {"name": "my_column_name_1", "description": "your column description 1!!"},
         {"name": "my_column_name_2", "description": "your column description 2!!"},
         {"name": "my_column_name_3", "description": "your column description 3!!"}
-    ]
+    ],
+    labels: {
+        "key": "value",
+        "key": "value"
+    }
 }
 EOF
 ```
