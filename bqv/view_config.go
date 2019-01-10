@@ -258,8 +258,6 @@ func (v *ViewConfig) Diff(ctx context.Context, client *bigquery.Client, params m
 		}, nil
 	}
 
-	logrus.Debugf("metadata from api(%s.%s):%s", v.DatasetName, v.ViewName, m)
-
 	// parse metadata string from TableMetadata and file
 	newMetaByte := make([]byte, 0, 1024)
 	oldMetaByte := make([]byte, 0, 1024)
