@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -29,6 +30,7 @@ type ViewConfig struct {
 			Name        string `json:"name"`
 			Description string `json:"description,omitempty"`
 		} `json:"schema"`
+		Labels map[string]string `json:"labels,omitempty"`
 	}
 }
 
@@ -110,13 +112,22 @@ func (v *ViewConfig) Apply(ctx context.Context, client *bigquery.Client, params 
 	}
 
 	// update view
-	_, err = view.Update(ctx, bigquery.TableMetadataToUpdate{
+	tm := bigquery.TableMetadataToUpdate{
 		Name:         v.ViewName,
 		ViewQuery:    q,
 		UseLegacySQL: false,
 		Description:  m.Description,
 		Schema:       m.Schema,
-	}, m.ETag)
+	}
+	for key, value := range m.Labels {
+		tm.DeleteLabel(key)
+		logrus.Debugf("Delete labels (%s:%s) ...", key, value)
+	}
+	for key, value := range v.MetadataFromFile.Labels {
+		tm.SetLabel(key, value)
+		logrus.Debugf("Set labels (%s:%s) ...", key, value)
+	}
+	_, err = view.Update(ctx, tm, m.ETag)
 	if err != nil {
 		logrus.Errorf("Failed to update view: %s", err.Error())
 		return false, err
@@ -251,14 +262,36 @@ func (v *ViewConfig) Diff(ctx context.Context, client *bigquery.Client, params m
 	newMetaByte := make([]byte, 0, 1024)
 	oldMetaByte := make([]byte, 0, 1024)
 	if &v.MetadataFromFile != nil {
+		// create old metadata string from metadata object
 		oldMetaByte = append(oldMetaByte, m.Description...)
 		for _, value := range m.Schema {
 			oldMetaByte = append(oldMetaByte, value.Description...)
 		}
+
+		var oldLabelStringList []string
+		for key, value := range m.Labels {
+			oldLabelStringList = append(oldLabelStringList, key+value)
+		}
+		sort.Strings(oldLabelStringList)
+		for _, keyValueString := range oldLabelStringList {
+			oldMetaByte = append(oldMetaByte, keyValueString...)
+		}
+
+		// create new metadata string from json struct
 		newMetaByte = append(newMetaByte, v.MetadataFromFile.Description...)
 		for _, value := range v.MetadataFromFile.Schema {
 			newMetaByte = append(newMetaByte, value.Description...)
 		}
+
+		var newLabelStringList []string
+		for key, value := range v.MetadataFromFile.Labels {
+			newLabelStringList = append(newLabelStringList, key+value)
+		}
+		sort.Strings(newLabelStringList)
+		for _, keyValueString := range newLabelStringList {
+			newMetaByte = append(newMetaByte, keyValueString...)
+		}
+
 	}
 	logrus.Debugf("Old metadata string:%s", string(oldMetaByte))
 	logrus.Debugf("New metadata string:%s", string(newMetaByte))
@@ -353,7 +386,7 @@ func createViewConfigFromQueryFile(datasetName, viewName, queryFileName, metadat
 			logrus.Errorf("JSON Unmarshal error: file(%s): %s", metadataFileName, err.Error())
 			return nil, err
 		}
-		logrus.Debugf("metadata(%s.%s):%s", vc.DatasetName, vc.ViewName, vc.MetadataFromFile)
+		logrus.Debugf("metadata from file(%s.%s):%s", vc.DatasetName, vc.ViewName, vc.MetadataFromFile)
 	}
 
 	return vc, nil
